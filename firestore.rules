@@ -1,0 +1,114 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{userId}
+    // Fields:
+    //   - email: string (required, email format)
+    //   - displayName: string (optional)
+    //   - photoURL: string (optional, uri format)
+    //   - aiQuota: number (required, >= 0)
+    //   - isPremium: bool (optional)
+    //
+    // Collection: /users/{userId}/downloads/{downloadId}
+    // Fields:
+    //   - url: string (required, uri format)
+    //   - filename: string (required)
+    //   - size: number (required, >= 0)
+    //   - progress: number (required, 0-100)
+    //   - status: string (required, enum: downloading, paused, completed, error)
+    //   - addedAt: number (required, timestamp)
+    //   - protocol: string (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "pychen.cd@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*") || url.matches("^magnet:.*") || url.matches("^torrent:.*") || url.matches("^ipfs:.*"));
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser(data) {
+      return hasRequiredFields(['email', 'aiQuota']) &&
+             data.email is string && isValidEmail(data.email) &&
+             data.aiQuota is number && data.aiQuota >= 0 &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 500)) &&
+             (!('isPremium' in data) || data.isPremium is bool);
+    }
+
+    function isValidDownload(data) {
+      return hasRequiredFields(['url', 'filename', 'size', 'progress', 'status', 'addedAt', 'protocol']) &&
+             data.url is string && data.url.size() < 2048 &&
+             data.filename is string && data.filename.size() < 255 &&
+             data.size is number && data.size >= 0 &&
+             data.progress is number && data.progress >= 0 && data.progress <= 100 &&
+             data.status in ['downloading', 'paused', 'completed', 'error'] &&
+             data.addedAt is number &&
+             data.protocol is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      
+      allow create: if isOwner(userId) && 
+                      isValidUser(request.resource.data) && 
+                      request.resource.data.aiQuota == 50 && // Default quota for new users
+                      (!('role' in request.resource.data) || request.resource.data.role == 'user');
+                      
+      allow update: if (isOwner(userId) && 
+                       isValidUser(request.resource.data) && 
+                       request.resource.data.aiQuota == resource.data.aiQuota && // Users cannot change their own quota
+                       (!('role' in request.resource.data) || request.resource.data.role == resource.data.role)) || // Users cannot change their own role
+                    isAdmin();
+
+      match /downloads/{downloadId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidDownload(request.resource.data);
+        allow update: if isOwner(userId) && isValidDownload(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

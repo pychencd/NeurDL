@@ -1,0 +1,5 @@
+{
+  "name": "NeurDL",
+  "description": "AI-native high-performance downloader with Google Login, AI quota management, and multi-protocol support.",
+  "requestFramePermissions": []
+}
