@@ -35,7 +35,14 @@
     },
     "linux": {
       "target": "AppImage"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "pychencd",
+        "repo": "NeurDL"
+      }
+    ]
   },
   "dependencies": {
     "@google/genai": "^1.48.0",
