@@ -1,5 +1,8 @@
 {
   "name": "neurdl",
+  "author": "pychencd",
+  "description": "AI-Native High-Performance Downloader",
+  "repository": "github:pychencd/NeurDL",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -24,7 +27,8 @@
       "package.json"
     ],
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "identity": null
     },
     "win": {
       "target": "nsis"

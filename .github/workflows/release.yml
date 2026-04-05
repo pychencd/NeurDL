@@ -3,7 +3,7 @@ name: Build and Release Electron App
 on:
   push:
     tags:
-      - 'v*' # 触发条件：当你推送以 v 开头的 tag 时（例如 v1.0.0）
+      - 'v*'
 
 permissions:
   contents: write
@@ -31,6 +31,8 @@ jobs:
         run: npm run build
 
       - name: Build and Release Electron App
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --publish always
+        uses: samuelmeuli/action-electron-builder@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release: true
+
